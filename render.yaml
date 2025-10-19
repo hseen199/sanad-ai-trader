@@ -5,7 +5,7 @@ services:
     plan: free
     rootDir: ai_backend
     buildCommand: pip install -r requirements.txt
-    startCommand: python ultimate_api.py
+    startCommand: gunicorn --bind 0.0.0.0:$PORT ultimate_api:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.8
