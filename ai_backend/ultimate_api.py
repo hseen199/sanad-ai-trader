@@ -21,7 +21,14 @@ CORS(app)
 
 # تخزين المحافظ والجلسات
 portfolios = {}
-decision_engine = DecisionEngine()
+decision_engine = None  # سيتم تحميله عند الحاجة
+
+def get_decision_engine():
+    """تحميل محرك القرار عند الحاجة فقط"""
+    global decision_engine
+    if decision_engine is None:
+        decision_engine = DecisionEngine()
+    return decision_engine
 
 # ==================== APIs ====================
 
@@ -111,7 +118,8 @@ def analyze_market():
         
         # الحصول على القرار
         current_idx = len(df) - 1
-        signal, confidence, stop_loss, take_profit, strategies = decision_engine.get_consensus_decision(df, current_idx)
+        engine = get_decision_engine()
+        signal, confidence, stop_loss, take_profit, strategies = engine.get_consensus_decision(df, current_idx)
         
         current_price = df['Close'].iloc[current_idx]
         
