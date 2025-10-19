@@ -2,23 +2,20 @@
 ai_backend/
 anchor_program/
 tools/
-plugins/
 
 # Ignore Python files
 *.py
 *.pyc
 __pycache__/
-requirements.txt
-runtime.txt
 
 # Ignore Render config
 render.yaml
 
-# Ignore documentation
-*.md
-!README.md
-
-# Ignore git
-.git/
-.gitignore
+# Ignore documentation (except README)
+DEPLOYMENT.md
+FINAL_REPORT.md
+FREE_DEPLOYMENT_GUIDE.md
+PROJECT_STRUCTURE.md
+QUICK_START.md
+README_ULTIMATE.md
 
