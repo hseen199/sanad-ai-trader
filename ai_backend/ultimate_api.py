@@ -10,6 +10,7 @@ from ultimate_ai_engine import (
     DecisionEngine,
     calculate_all_indicators
 )
+from price_feed import get_price_feed
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -22,6 +23,7 @@ CORS(app)
 # تخزين المحافظ والجلسات
 portfolios = {}
 decision_engine = None  # سيتم تحميله عند الحاجة
+price_feed = get_price_feed()  # نظام جلب الأسعار اللحظية
 
 def get_decision_engine():
     """تحميل محرك القرار عند الحاجة فقط"""
@@ -43,7 +45,9 @@ def home():
             'إدارة محفظة ذكية',
             'تقسيم صفقات تلقائي',
             'إدارة مخاطر متقدمة',
-            'تحليل عميق قبل كل قرار'
+            'تحليل عميق قبل كل قرار',
+            'أسعار لحظية حقيقية من السوق',
+            f'{price_feed.get_token_count()}+ عملة مدعومة'
         ]
     })
 
@@ -327,4 +331,157 @@ def health_check():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
+
+
+
+# ==================== Price Feed APIs ====================
+
+@app.route('/api/v1/price/current', methods=['GET'])
+def get_current_price():
+    """الحصول على السعر الحالي لعملة معينة"""
+    try:
+        token_symbol = request.args.get('symbol', 'SOL')
+        
+        price = price_feed.get_current_price(token_symbol)
+        
+        if price:
+            return jsonify({
+                'status': 'success',
+                'symbol': token_symbol,
+                'price': float(price),
+                'timestamp': datetime.now().isoformat(),
+                'source': 'live_market'
+            })
+        else:
+            return jsonify({'error': f'لم نتمكن من جلب سعر {token_symbol}'}), 404
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/price/multiple', methods=['POST'])
+def get_multiple_prices():
+    """الحصول على أسعار متعددة دفعة واحدة"""
+    try:
+        data = request.json
+        symbols = data.get('symbols', ['SOL'])
+        
+        prices = price_feed.get_multiple_prices(symbols)
+        
+        return jsonify({
+            'status': 'success',
+            'prices': prices,
+            'timestamp': datetime.now().isoformat(),
+            'count': len(prices)
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/price/supported-tokens', methods=['GET'])
+def get_supported_tokens():
+    """الحصول على قائمة العملات المدعومة"""
+    try:
+        tokens = price_feed.get_all_supported_tokens()
+        
+        return jsonify({
+            'status': 'success',
+            'tokens': tokens,
+            'count': len(tokens),
+            'network': 'Solana'
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/market/live-data', methods=['GET'])
+def get_live_market_data():
+    """الحصول على بيانات السوق الحية للتحليل"""
+    try:
+        token_symbol = request.args.get('symbol', 'SOL')
+        limit = int(request.args.get('limit', 100))
+        
+        market_data = price_feed.get_live_market_data(token_symbol, limit=limit)
+        
+        if market_data is not None:
+            # تحويل DataFrame إلى JSON
+            data_dict = market_data.to_dict(orient='records')
+            
+            return jsonify({
+                'status': 'success',
+                'symbol': token_symbol,
+                'data': data_dict,
+                'count': len(data_dict),
+                'timestamp': datetime.now().isoformat()
+            })
+        else:
+            return jsonify({'error': f'لم نتمكن من جلب بيانات {token_symbol}'}), 404
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/analysis/live', methods=['POST'])
+def analyze_live_market():
+    """تحليل السوق الحي مع بيانات حقيقية"""
+    try:
+        data = request.json
+        token_symbol = data.get('symbol', 'SOL')
+        wallet_address = data.get('wallet_address')
+        
+        # جلب بيانات السوق الحية
+        market_data = price_feed.get_live_market_data(token_symbol, limit=100)
+        
+        if market_data is None:
+            return jsonify({'error': f'لم نتمكن من جلب بيانات {token_symbol}'}), 404
+        
+        # حساب المؤشرات
+        df = calculate_all_indicators(market_data)
+        
+        # الحصول على القرار
+        current_idx = len(df) - 1
+        engine = get_decision_engine()
+        signal, confidence, stop_loss, take_profit, strategies = engine.get_consensus_decision(df, current_idx)
+        
+        current_price = df['Close'].iloc[current_idx]
+        
+        # حساب حجم الصفقة إذا كانت المحفظة موجودة
+        position_size = None
+        if wallet_address and wallet_address in portfolios:
+            portfolio = portfolios[wallet_address]
+            if signal != 0 and stop_loss:
+                position_size = portfolio.calculate_position_size(
+                    current_price,
+                    stop_loss,
+                    confidence
+                )
+        
+        signal_text = 'Hold'
+        if signal == 1:
+            signal_text = 'Buy'
+        elif signal == 2:
+            signal_text = 'Sell'
+        
+        return jsonify({
+            'status': 'success',
+            'symbol': token_symbol,
+            'analysis': {
+                'signal': signal_text,
+                'confidence': float(confidence),
+                'current_price': float(current_price),
+                'stop_loss': float(stop_loss) if stop_loss else None,
+                'take_profit': float(take_profit) if take_profit else None,
+                'position_size': float(position_size) if position_size else None,
+                'strategies_used': strategies,
+                'data_source': 'live_market',
+                'network': 'Solana',
+                'timestamp': datetime.now().isoformat()
+            }
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
