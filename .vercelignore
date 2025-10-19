@@ -1,0 +1,24 @@
+# Ignore backend files
+ai_backend/
+anchor_program/
+tools/
+plugins/
+
+# Ignore Python files
+*.py
+*.pyc
+__pycache__/
+requirements.txt
+runtime.txt
+
+# Ignore Render config
+render.yaml
+
+# Ignore documentation
+*.md
+!README.md
+
+# Ignore git
+.git/
+.gitignore
+
