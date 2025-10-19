@@ -1,5 +1,5 @@
 # SANAD AI Trader - Backend Requirements
-# Updated for Python 3.11+ compatibility
+# Updated for Python 3.11+ compatibility with Database Support
 
 # Web Framework
 flask==3.0.3
@@ -22,10 +22,13 @@ ta==0.11.0
 # API and Networking
 requests==2.31.0
 
+# Database
+sqlalchemy==2.0.27
+psycopg2-binary==2.9.9
+
 # Utilities
 python-dateutil==2.9.0
 pytz==2024.1
-
 
 # Production WSGI Server
 gunicorn==21.2.0
