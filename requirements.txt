@@ -1,0 +1,9 @@
+pandas
+numpy
+stable-baselines3[extra]
+gymnasium
+solana
+requests
+matplotlib
+flask
+flask-cors
