@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: sanad-backend
+    runtime: python
+    plan: free
+    rootDir: ai_backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python ultimate_api.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.8
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: False
+      - key: PORT
+        value: 5000
+      - key: SOLANA_RPC_URL
+        value: https://api.mainnet-beta.solana.com
+      - key: SUBSCRIPTION_WALLET
+        value: 4WFksLbfb1hsBbUx8Xn3bic9esKfqy47x8phyYwbSBcK
+      - key: SECRET_KEY
+        generateValue: true
+
