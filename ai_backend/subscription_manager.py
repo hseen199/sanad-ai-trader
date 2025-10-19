@@ -267,6 +267,28 @@ class SubscriptionManager:
         finally:
             session.close()
     
+    def renew_subscription(self, wallet_address: str, amount_paid: float = None) -> bool:
+        """
+        تجديد الاشتراك (يستخدم من قبل Webhook)
+        
+        Args:
+            wallet_address: عنوان محفظة المستخدم
+            amount_paid: المبلغ المدفوع (اختياري، افتراضي 0.1 SOL)
+        
+        Returns:
+            bool: True إذا تم التجديد بنجاح
+        """
+        if amount_paid is None:
+            amount_paid = self.MONTHLY_PRICE_SOL
+        
+        success, msg = self.verify_and_activate_subscription(
+            wallet_address=wallet_address,
+            transaction_signature=f"WEBHOOK_{int(datetime.utcnow().timestamp())}",
+            amount_paid=amount_paid
+        )
+        
+        return success
+    
     def suspend_subscription(self, wallet_address: str) -> Tuple[bool, str]:
         """
         تعليق الاشتراك (عند عدم الدفع)

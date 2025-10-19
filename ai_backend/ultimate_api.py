@@ -765,3 +765,51 @@ def get_trade_quote():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+
+
+# ==================== Helius Webhook Endpoint ====================
+
+from helius_webhook import HeliusWebhookHandler
+import os
+
+# إنشاء معالج الـ Webhook
+webhook_handler = HeliusWebhookHandler(
+    webhook_secret=os.environ.get('HELIUS_WEBHOOK_SECRET')
+)
+
+
+@app.route('/api/v1/webhook/payment', methods=['POST'])
+def helius_webhook():
+    """استقبال ومعالجة Webhooks من Helius"""
+    try:
+        # الحصول على البيانات
+        data = request.json
+        
+        # التحقق من التوقيع (اختياري)
+        signature = request.headers.get('X-Helius-Signature')
+        if signature:
+            payload = request.get_data()
+            if not webhook_handler.verify_signature(payload, signature):
+                return jsonify({'error': 'توقيع غير صالح'}), 401
+        
+        # معالجة الـ Webhook
+        result = webhook_handler.handle_webhook(data)
+        
+        return jsonify(result), 200
+    
+    except Exception as e:
+        logger.error(f"❌ خطأ في معالجة webhook: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/webhook/test', methods=['GET'])
+def test_webhook():
+    """اختبار Webhook Endpoint"""
+    return jsonify({
+        'status': 'ok',
+        'message': 'Webhook endpoint is working!',
+        'receiver_wallet': webhook_handler.RECEIVER_WALLET,
+        'subscription_amount_sol': webhook_handler.SUBSCRIPTION_AMOUNT_LAMPORTS / 1_000_000_000
+    })
+
