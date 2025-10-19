@@ -314,7 +314,14 @@ def health_check():
     })
 
 
+# For local development only
+# In production, use: gunicorn ultimate_api:app
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    # Only run Flask dev server if not in production
+    if os.environ.get('FLASK_ENV') != 'production':
+        app.run(host='0.0.0.0', port=port, debug=True)
+    else:
+        print("Production mode: Use Gunicorn to run this app")
+        print(f"Command: gunicorn --bind 0.0.0.0:{port} ultimate_api:app")
 
