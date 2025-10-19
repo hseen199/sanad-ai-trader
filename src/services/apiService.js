@@ -178,6 +178,53 @@ export const aiService = {
 };
 
 /**
+ * خدمات المحفظة
+ */
+export const portfolioService = {
+  info: async (walletAddress) => {
+    return apiRequest(`/api/v1/portfolio/info?walletAddress=${walletAddress}`, {
+      method: 'GET',
+    });
+  },
+
+  positions: async (walletAddress) => {
+    return apiRequest(`/api/v1/portfolio/positions?walletAddress=${walletAddress}`, {
+      method: 'GET',
+    });
+  },
+
+  history: async (walletAddress, limit = 50) => {
+    return apiRequest(`/api/v1/portfolio/history?walletAddress=${walletAddress}&limit=${limit}`, {
+      method: 'GET',
+    });
+  },
+};
+
+/**
+ * خدمات الأسعار
+ */
+export const priceService = {
+  current: async (symbol) => {
+    return apiRequest(`/api/v1/price/current?symbol=${symbol}`, {
+      method: 'GET',
+    });
+  },
+
+  multiple: async (symbols) => {
+    return apiRequest('/api/v1/price/multiple', {
+      method: 'POST',
+      body: JSON.stringify({ symbols }),
+    });
+  },
+
+  supported: async () => {
+    return apiRequest('/api/v1/price/supported-tokens', {
+      method: 'GET',
+    });
+  },
+};
+
+/**
  * خدمات الحساب
  */
 export const accountService = {

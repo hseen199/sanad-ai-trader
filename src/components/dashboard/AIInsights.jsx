@@ -1,69 +1,13 @@
 
-    import React, { useState, useEffect } from 'react';
+    import React from 'react';
     import { motion } from 'framer-motion';
     import { Brain, TrendingUp, AlertTriangle, Lightbulb } from 'lucide-react';
     import { useTranslation } from 'react-i18next';
     
     const AIInsights = () => {
-  const [aiPrediction, setAiPrediction] = useState(null);
-  const [loadingPrediction, setLoadingPrediction] = useState(true);
-  const [errorPrediction, setErrorPrediction] = useState(null);
-
-  useEffect(() => {
-    const fetchAIPrediction = async () => {
-      try {
-        setLoadingPrediction(true);
-        // Placeholder for actual market data to send to AI backend
-        // In a real scenario, you would fetch live market data (e.g., current price, volume, etc.)
-        // and calculate indicators (SMA, RSI, MACD) on the frontend or have the backend do it.
-        // For now, we'll send dummy data that matches the expected observation space.
-        const dummyObservation = [
-          150.0, // Close price
-          50000.0, // Volume
-          148.0, // SMA_10
-          140.0, // SMA_30
-          60.0, // RSI
-          2.0, // MACD
-          1.5 // Signal
-        ];
-
-        const response = await fetch('https://5000-ioug3amyvj8hlf9cff73o-14ba431b.manus.computer/predict_trade', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ observation: dummyObservation }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        setAiPrediction(data.action);
-      } catch (error) {
-        console.error("Error fetching AI prediction:", error);
-        setErrorPrediction(error.message);
-      } finally {
-        setLoadingPrediction(false);
-      }
-    };
-
-    fetchAIPrediction();
-  }, []);
       const { t } = useTranslation();
     
       const insights = [
-        {
-          icon: Brain,
-          type: t('AI Action'),
-          title: aiPrediction ? t('Predicted Action: ') + aiPrediction.toUpperCase() : t('Fetching AI Prediction...'),
-          description: aiPrediction ? t('The AI model predicts the next optimal action for trading.') : t('Waiting for AI model to provide a prediction.'),
-          confidence: aiPrediction ? 95 : 0,
-          color: aiPrediction === 'buy' ? 'green' : aiPrediction === 'sell' ? 'red' : 'blue',
-        },
-        // Existing insights
-        
         {
           icon: TrendingUp,
           type: t('opportunity'),
@@ -103,9 +47,6 @@
               </div>
               <div>
                 <h3 className="text-2xl font-bold text-white">{t('ai_insights')}</h3>
-                {loadingPrediction && <p className="text-sm text-blue-300">{t('loading_ai_prediction')}</p>}
-                {errorPrediction && <p className="text-sm text-red-400">{t('error_ai_prediction')}: {errorPrediction}</p>}
-                {aiPrediction && <p className="text-sm text-green-400">{t('ai_predicted_action')}: {aiPrediction.toUpperCase()}</p>}
                 <p className="text-sm text-blue-300">{t('ai_insights_desc')}</p>
               </div>
             </div>
