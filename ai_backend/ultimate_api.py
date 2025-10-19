@@ -374,15 +374,6 @@ def analyze_live_market():
         return jsonify({'error': str(e)}), 500
 
 
-# ==================== Run Server ====================
-
-if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
-
-
-
-
 # ==================== Subscription APIs ====================
 
 from subscription_manager import SubscriptionManager
@@ -812,4 +803,13 @@ def test_webhook():
         'receiver_wallet': webhook_handler.RECEIVER_WALLET,
         'subscription_amount_sol': webhook_handler.SUBSCRIPTION_AMOUNT_LAMPORTS / 1_000_000_000
     })
+
+
+
+
+# ==================== Run Server ====================
+
+if __name__ == '__main__':
+    port = int(os.getenv('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
 
