@@ -593,3 +593,175 @@ def create_solana_pay_request():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+
+
+# ==================== Trading Execution (Jupiter Integration) ====================
+
+from trade_executor import TradeExecutor
+
+trade_executor = TradeExecutor()
+
+
+@app.route('/api/v1/trade/prepare-buy', methods=['POST'])
+def prepare_buy_order():
+    """تحضير أمر شراء"""
+    try:
+        data = request.json
+        wallet_address = data.get('wallet_address')
+        symbol = data.get('symbol')
+        amount_usd = float(data.get('amount_usd'))
+        slippage_bps = int(data.get('slippage_bps', 50))
+        
+        if not wallet_address or not symbol or not amount_usd:
+            return jsonify({'error': 'بيانات ناقصة'}), 400
+        
+        # تحضير الأمر
+        order = trade_executor.prepare_buy_order(
+            wallet_address=wallet_address,
+            symbol=symbol,
+            amount_usd=amount_usd,
+            slippage_bps=slippage_bps
+        )
+        
+        if not order:
+            return jsonify({'error': 'فشل تحضير الأمر'}), 400
+        
+        if order.get('error'):
+            return jsonify(order), 403
+        
+        return jsonify({
+            'status': 'success',
+            'order': order
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/trade/prepare-sell', methods=['POST'])
+def prepare_sell_order():
+    """تحضير أمر بيع"""
+    try:
+        data = request.json
+        wallet_address = data.get('wallet_address')
+        symbol = data.get('symbol')
+        amount = float(data.get('amount'))
+        slippage_bps = int(data.get('slippage_bps', 50))
+        
+        if not wallet_address or not symbol or not amount:
+            return jsonify({'error': 'بيانات ناقصة'}), 400
+        
+        # تحضير الأمر
+        order = trade_executor.prepare_sell_order(
+            wallet_address=wallet_address,
+            symbol=symbol,
+            amount=amount,
+            slippage_bps=slippage_bps
+        )
+        
+        if not order:
+            return jsonify({'error': 'فشل تحضير الأمر'}), 400
+        
+        if order.get('error'):
+            return jsonify(order), 403
+        
+        return jsonify({
+            'status': 'success',
+            'order': order
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/trade/execute', methods=['POST'])
+def execute_trade():
+    """تنفيذ صفقة موقعة"""
+    try:
+        data = request.json
+        request_id = data.get('request_id')
+        signed_transaction = data.get('signed_transaction')
+        trade_type = data.get('trade_type')
+        wallet_address = data.get('wallet_address')
+        symbol = data.get('symbol')
+        amount = float(data.get('amount'))
+        price = float(data.get('price'))
+        
+        if not all([request_id, signed_transaction, trade_type, wallet_address, symbol]):
+            return jsonify({'error': 'بيانات ناقصة'}), 400
+        
+        # تنفيذ الصفقة
+        result = trade_executor.execute_trade(
+            request_id=request_id,
+            signed_transaction=signed_transaction,
+            trade_type=trade_type,
+            wallet_address=wallet_address,
+            symbol=symbol,
+            amount=amount,
+            price=price
+        )
+        
+        if not result:
+            return jsonify({'error': 'فشل تنفيذ الصفقة'}), 400
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/trade/quote', methods=['GET'])
+def get_trade_quote():
+    """الحصول على عرض سعر"""
+    try:
+        input_token = request.args.get('input_token', 'SOL')
+        output_token = request.args.get('output_token', 'USDC')
+        amount = float(request.args.get('amount', 1.0))
+        
+        quote = trade_executor.jupiter.get_quote(
+            input_token=input_token,
+            output_token=output_token,
+            amount=amount
+        )
+        
+        if not quote:
+            return jsonify({'error': 'فشل الحصول على العرض'}), 400
+        
+        # حساب السعر بشكل مقروء
+        in_amount = float(quote.get('inAmount', 0))
+        out_amount = float(quote.get('outAmount', 0))
+        
+        # تحويل من lamports
+        if input_token.upper() == 'SOL':
+            in_amount_readable = in_amount / 1_000_000_000
+        elif input_token.upper() in ['USDC', 'USDT']:
+            in_amount_readable = in_amount / 1_000_000
+        else:
+            in_amount_readable = in_amount / 1_000_000_000
+        
+        if output_token.upper() == 'SOL':
+            out_amount_readable = out_amount / 1_000_000_000
+        elif output_token.upper() in ['USDC', 'USDT']:
+            out_amount_readable = out_amount / 1_000_000
+        else:
+            out_amount_readable = out_amount / 1_000_000_000
+        
+        price = out_amount_readable / in_amount_readable if in_amount_readable > 0 else 0
+        
+        return jsonify({
+            'status': 'success',
+            'quote': {
+                'input_token': input_token,
+                'output_token': output_token,
+                'input_amount': in_amount_readable,
+                'output_amount': out_amount_readable,
+                'price': price,
+                'price_impact': quote.get('priceImpact', 0),
+                'slippage_bps': quote.get('slippageBps', 0)
+            }
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
