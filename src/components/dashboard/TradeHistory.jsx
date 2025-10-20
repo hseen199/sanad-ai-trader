@@ -2,25 +2,88 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Clock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { portfolioService } from '@/services/apiService';
 
-const TradeHistory = () => {
+const TradeHistory = ({ walletAddress }) => {
   const { t } = useTranslation();
   const [trades, setTrades] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedTrades = JSON.parse(localStorage.getItem('trades') || '[]');
-    setTrades(savedTrades);
-  }, []);
+    const fetchHistory = async () => {
+      if (!walletAddress) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        setLoading(true);
+        const data = await portfolioService.history(walletAddress, 50);
+        
+        if (data.status === 'success' && data.history) {
+          // تحويل البيانات من Backend إلى الصيغة المتوقعة
+          const formattedTrades = data.history.map(trade => ({
+            id: trade.id,
+            type: trade.trade_type === 'buy' ? 'BUY' : 'SELL',
+            symbol: trade.symbol,
+            amount: trade.amount || 0,
+            profit: trade.pnl || 0,
+            timestamp: trade.exit_time || trade.entry_time,
+            entry_price: trade.entry_price,
+            exit_price: trade.exit_price
+          }));
+          
+          setTrades(formattedTrades);
+          // حفظ في localStorage كـ backup
+          localStorage.setItem('trades', JSON.stringify(formattedTrades));
+        } else {
+          setTrades([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch trade history:', error);
+        // Fallback إلى localStorage
+        const savedTrades = JSON.parse(localStorage.getItem('trades') || '[]');
+        setTrades(savedTrades);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHistory();
+    // تحديث كل 30 ثانية
+    const interval = setInterval(fetchHistory, 30000);
+    return () => clearInterval(interval);
+  }, [walletAddress]);
 
   const formatDate = (timestamp) => {
-    const date = new Date(timestamp);
-    return date.toLocaleString('ar-SA', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    if (!timestamp) return 'غير محدد';
+    
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleString('ar-SA', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch (error) {
+      return 'غير محدد';
+    }
   };
+
+  if (loading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="gradient-border p-6 rounded-xl"
+      >
+        <div className="text-center py-12">
+          <p className="text-gray-400">جاري التحميل...</p>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -60,7 +123,7 @@ const TradeHistory = () => {
                 </div>
                 <div>
                   <p className="text-white font-semibold">
-                    {trade.type === 'BUY' ? 'شراء' : 'بيع'}
+                    {trade.symbol} - {trade.type === 'BUY' ? 'شراء' : 'بيع'}
                   </p>
                   <p className="text-sm text-gray-400">{formatDate(trade.timestamp)}</p>
                 </div>
@@ -81,3 +144,4 @@ const TradeHistory = () => {
 };
 
 export default TradeHistory;
+

@@ -56,31 +56,49 @@
         return () => clearInterval(interval);
       }, [publicKey, connection]);
 
-      useEffect(() => {
-        const savedProfit = localStorage.getItem('profit');
+  // جلب بيانات الأداء من API
+  useEffect(() => {
+    const fetchPerformance = async () => {
+      if (!walletAddress) return;
+      
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/v1/account/performance?wallet_address=${walletAddress}&period=7d`);
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+          setWeeklyProfit(data.weekly_profit || 0);
+          setProfit(data.total_profit || 0);
+          localStorage.setItem('weeklyProfit', data.weekly_profit.toString());
+          localStorage.setItem('profit', data.total_profit.toString());
+        }
+      } catch (error) {
+        console.error('Failed to fetch performance:', error);
+        // Fallback إلى localStorage
         const savedWeeklyProfit = localStorage.getItem('weeklyProfit');
-        
-        if (savedProfit) setProfit(parseFloat(savedProfit));
-        
-        if (savedProfit) setProfit(parseFloat(savedProfit));
+        const savedProfit = localStorage.getItem('profit');
         if (savedWeeklyProfit) setWeeklyProfit(parseFloat(savedWeeklyProfit));
-        else {
-            const initialWeeklyProfit = (Math.random() * 15) + 2;
-            setWeeklyProfit(initialWeeklyProfit);
-            localStorage.setItem('weeklyProfit', initialWeeklyProfit.toString());
-        }
+        else setWeeklyProfit(0);
+        if (savedProfit) setProfit(parseFloat(savedProfit));
+        else setProfit(0);
+      }
+    };
     
-        const adminWallets = JSON.parse(localStorage.getItem('adminWallets') || '[]');
-        if (adminWallets.includes(walletAddress)) {
-          setIsAdmin(true);
-        }
-        
-        const settings = JSON.parse(localStorage.getItem('tradingSettings'));
-        if (settings) {
-          setIsBotActive(settings.autoTrading !== false);
-        }
+    fetchPerformance();
+    const interval = setInterval(fetchPerformance, 60000); // تحديث كل دقيقة
     
-      }, [walletAddress]);
+    // فحص الصلاحيات والإعدادات
+    const adminWallets = JSON.parse(localStorage.getItem('adminWallets') || '[]');
+    if (adminWallets.includes(walletAddress)) {
+      setIsAdmin(true);
+    }
+    
+    const settings = JSON.parse(localStorage.getItem('tradingSettings'));
+    if (settings) {
+      setIsBotActive(settings.autoTrading !== false);
+    }
+    
+    return () => clearInterval(interval);
+  }, [walletAddress]);
     
       return (
         <div className="container mx-auto px-4 py-8">

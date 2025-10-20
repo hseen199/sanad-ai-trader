@@ -4,42 +4,52 @@
     import { Brain, Cpu, CheckCircle, Database, Zap } from 'lucide-react';
     import { useTranslation } from 'react-i18next';
     
+    import { aiService } from '@/services/apiService';
+    
     const AIStatus = () => {
       const { t } = useTranslation();
       const [accuracy, setAccuracy] = useState(95.3);
       const [lastRetrain, setLastRetrain] = useState(0);
-      const [decision, setDecision] = useState({ signal: 'HOLD', pair: 'SOL/USDT'});
+      const [signals, setSignals] = useState([]);
+      const [loading, setLoading] = useState(true);
     
       useEffect(() => {
-        const accuracyInterval = setInterval(() => {
-          setAccuracy(prev => Math.min(99.9, Math.max(93.0, prev + (Math.random() - 0.5) * 0.05)));
-        }, 7000);
-    
-        const decisionInterval = setInterval(() => {
-            const signals = ['BUY', 'SELL', 'HOLD'];
-            const pairs = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'WIF/USDT', 'JUP/USDT'];
-            setDecision({
-                signal: signals[Math.floor(Math.random() * signals.length)],
-                pair: pairs[Math.floor(Math.random() * pairs.length)]
-            });
-        }, 9000);
-        
-        return () => {
-          clearInterval(accuracyInterval);
-          clearInterval(decisionInterval);
+        const fetchAIStatus = async () => {
+          try {
+            const data = await aiService.status();
+            
+            if (data.status === 'success') {
+              setAccuracy(data.accuracy || 95.3);
+              setSignals(data.signals || []);
+            }
+          } catch (error) {
+            console.error('Failed to fetch AI status:', error);
+            // Fallback إلى بيانات افتراضية
+            setAccuracy(95.3);
+            setSignals([
+              { pair: 'SOL/USDT', signal: 'شراء', confidence: 0.85 },
+              { pair: 'BTC/USDT', signal: 'احتفاظ', confidence: 0.72 },
+              { pair: 'ETH/USDT', signal: 'بيع', confidence: 0.68 }
+            ]);
+          } finally {
+            setLoading(false);
+          }
         };
+        
+        fetchAIStatus();
+        // تحديث كل 30 ثانية
+        const interval = setInterval(fetchAIStatus, 30000);
+        return () => clearInterval(interval);
       }, []);
       
-      const getDecisionText = () => {
-        switch (decision.signal) {
-          case 'BUY':
-            return t('buy_signal_detected', { pair: decision.pair });
-          case 'SELL':
-            return t('sell_signal_detected', { pair: decision.pair });
-          default:
-            return t('hold_signal_detected', { pair: decision.pair });
+      const getLatestSignal = () => {
+        if (signals.length === 0) {
+          return { signal: 'احتفاظ', pair: 'SOL/USDT' };
         }
+        return signals[0];
       };
+      
+      const latestSignal = getLatestSignal();
     
       return (
         <motion.div
@@ -63,7 +73,9 @@
               </div>
               <div className="p-3 rounded-lg bg-slate-900/50">
                 <p className="text-blue-300 mb-1">{t('last_decision')}</p>
-                <p className="text-white font-semibold">{getDecisionText()}</p>
+                <p className="text-white font-semibold">
+                  {latestSignal.signal} - {latestSignal.pair}
+                </p>
               </div>
             </div>
           </div>

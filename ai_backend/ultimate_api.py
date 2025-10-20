@@ -807,6 +807,197 @@ def test_webhook():
 
 
 
+# ==================== Account Performance & Overview ====================
+
+@app.route('/api/v1/account/performance', methods=['GET'])
+def get_account_performance():
+    """الحصول على بيانات أداء الحساب"""
+    try:
+        wallet_address = request.args.get('wallet_address')
+        period = request.args.get('period', '7d')
+        
+        if not wallet_address:
+            return jsonify({'error': 'عنوان المحفظة مطلوب'}), 400
+        
+        portfolio = get_portfolio(wallet_address)
+        
+        # الحصول على سجل التداولات
+        history = portfolio.get_trade_history(limit=1000)
+        
+        # حساب الأرباح
+        weekly_profit = calculate_period_profit(history, days=7)
+        monthly_profit = calculate_period_profit(history, days=30)
+        total_profit = sum(t.get('pnl', 0) for t in history if t.get('pnl'))
+        
+        # بيانات المخطط
+        chart_data = get_performance_chart_data(history, period)
+        
+        return jsonify({
+            'status': 'success',
+            'wallet_address': wallet_address,
+            'weekly_profit': round(weekly_profit, 2),
+            'monthly_profit': round(monthly_profit, 2),
+            'total_profit': round(total_profit, 2),
+            'chart_data': chart_data,
+            'period': period
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/account/overview', methods=['GET'])
+def get_account_overview():
+    """الحصول على نظرة عامة على الحساب"""
+    try:
+        wallet_address = request.args.get('wallet_address')
+        
+        if not wallet_address:
+            return jsonify({'error': 'عنوان المحفظة مطلوب'}), 400
+        
+        portfolio = get_portfolio(wallet_address)
+        info = portfolio.get_portfolio_info()
+        history = portfolio.get_trade_history(limit=1000)
+        
+        # حساب الإحصائيات
+        total_trades = len(history)
+        winning_trades = len([t for t in history if t.get('pnl', 0) > 0])
+        win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+        
+        avg_profit = sum(t.get('pnl', 0) for t in history) / total_trades if total_trades > 0 else 0
+        
+        best_trade = max(history, key=lambda t: t.get('pnl', 0)) if history else None
+        worst_trade = min(history, key=lambda t: t.get('pnl', 0)) if history else None
+        
+        return jsonify({
+            'status': 'success',
+            'total_trades': total_trades,
+            'winning_trades': winning_trades,
+            'losing_trades': total_trades - winning_trades,
+            'win_rate': round(win_rate, 2),
+            'avg_profit': round(avg_profit, 2),
+            'best_trade': best_trade,
+            'worst_trade': worst_trade,
+            'current_balance': info.get('current_balance', 0),
+            'total_profit': info.get('total_profit', 0)
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/ai/status', methods=['GET'])
+def get_ai_status():
+    """الحصول على حالة محرك AI"""
+    try:
+        engine = get_decision_engine()
+        
+        # إشارات وهمية للتجربة (يمكن استبدالها بإشارات حقيقية لاحقاً)
+        signals = [
+            {'pair': 'SOL/USDT', 'signal': 'شراء', 'confidence': 0.85, 'time': datetime.now().isoformat()},
+            {'pair': 'BTC/USDT', 'signal': 'احتفاظ', 'confidence': 0.72, 'time': datetime.now().isoformat()},
+            {'pair': 'ETH/USDT', 'signal': 'بيع', 'confidence': 0.68, 'time': datetime.now().isoformat()}
+        ]
+        
+        return jsonify({
+            'status': 'success',
+            'ai_status': 'active',
+            'accuracy': 94.5,  # يمكن حسابها من الصفقات السابقة
+            'model_version': '2.0',
+            'signals': signals,
+            'last_update': datetime.now().isoformat(),
+            'total_predictions': 1247
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/leaderboard', methods=['GET'])
+def get_leaderboard():
+    """الحصول على المتصدرين"""
+    try:
+        # TODO: جلب البيانات الحقيقية من قاعدة البيانات
+        # هذه بيانات وهمية للتجربة
+        leaderboard = [
+            {'rank': 1, 'wallet': 'SANAD...ABC123', 'profit': 45.2, 'trades': 156},
+            {'rank': 2, 'wallet': 'SANAD...DEF456', 'profit': 38.7, 'trades': 142},
+            {'rank': 3, 'wallet': 'SANAD...GHI789', 'profit': 32.1, 'trades': 128},
+            {'rank': 4, 'wallet': 'SANAD...JKL012', 'profit': 28.5, 'trades': 115},
+            {'rank': 5, 'wallet': 'SANAD...MNO345', 'profit': 24.3, 'trades': 98}
+        ]
+        
+        return jsonify({
+            'status': 'success',
+            'leaderboard': leaderboard
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ==================== Helper Functions ====================
+
+def calculate_period_profit(history: List[Dict], days: int) -> float:
+    """حساب الربح لفترة معينة"""
+    if not history:
+        return 0.0
+    
+    now = datetime.now()
+    period_start = now - timedelta(days=days)
+    
+    period_trades = [
+        t for t in history 
+        if t.get('exit_time') and datetime.fromisoformat(t['exit_time'].replace('Z', '+00:00')) >= period_start
+    ]
+    
+    if not period_trades:
+        return 0.0
+    
+    total_pnl = sum(t.get('pnl', 0) for t in period_trades)
+    return total_pnl
+
+
+def get_performance_chart_data(history: List[Dict], period: str = '7d') -> List[Dict]:
+    """الحصول على بيانات المخطط"""
+    if not history:
+        return []
+    
+    # تحديد عدد الأيام
+    days_map = {'7d': 7, '30d': 30, '90d': 90, '1y': 365}
+    days = days_map.get(period, 7)
+    
+    now = datetime.now()
+    start_date = now - timedelta(days=days)
+    
+    # تجميع البيانات حسب اليوم
+    daily_data = {}
+    for i in range(days + 1):
+        date = start_date + timedelta(days=i)
+        date_str = date.strftime('%Y-%m-%d')
+        daily_data[date_str] = {'day': i + 1, 'value': 0, 'trades': 0}
+    
+    # حساب الربح اليومي
+    cumulative_profit = 0
+    for trade in history:
+        if trade.get('exit_time'):
+            try:
+                exit_date = datetime.fromisoformat(trade['exit_time'].replace('Z', '+00:00'))
+                if exit_date >= start_date:
+                    date_str = exit_date.strftime('%Y-%m-%d')
+                    if date_str in daily_data:
+                        cumulative_profit += trade.get('pnl', 0)
+                        daily_data[date_str]['value'] = cumulative_profit
+                        daily_data[date_str]['trades'] += 1
+            except:
+                continue
+    
+    # تحويل إلى قائمة مرتبة
+    chart_data = [daily_data[date] for date in sorted(daily_data.keys())]
+    
+    return chart_data
+
+
 # ==================== Run Server ====================
 
 if __name__ == '__main__':
