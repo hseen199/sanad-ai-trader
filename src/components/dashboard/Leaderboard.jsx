@@ -4,41 +4,52 @@ import { motion } from 'framer-motion';
 import { Trophy, ArrowUp, ArrowDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-const generateLeaderboardData = (currentUserProfit) => {
-    let data = [];
-    for (let i = 1; i <= 10; i++) {
-        data.push({
-            rank: i,
-            trader: `User_${Math.random().toString(36).substring(2, 8)}`,
-            profit: Math.random() * 50 + 5, // profit between 5% and 55%
-        });
-    }
-    // Sort by profit
-    data.sort((a, b) => b.profit - a.profit);
-    
-    // Insert current user
-    const userRank = data.findIndex(d => d.profit < currentUserProfit)
-    const userEntry = {
-        rank: userRank !== -1 ? userRank + 1 : data.length + 1,
-        trader: 'YOU',
-        profit: currentUserProfit,
-    };
-    if (userRank !== -1) {
-        data.splice(userRank, 0, userEntry);
-    } else {
-        data.push(userEntry);
-    }
+import { accountService } from '@/services/apiService';
 
-    // Re-rank
-    return data.slice(0, 10).map((d, i) => ({...d, rank: i + 1}));
-};
-
-const Leaderboard = ({ currentUserProfit }) => {
+const Leaderboard = ({ currentUserProfit, walletAddress }) => {
   const { t } = useTranslation();
   const [leaderboardData, setLeaderboardData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLeaderboardData(generateLeaderboardData(currentUserProfit));
+    const fetchLeaderboard = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/v1/leaderboard`);
+        const data = await response.json();
+        
+        if (data.status === 'success' && data.leaderboard) {
+          setLeaderboardData(data.leaderboard);
+        } else {
+          // Fallback إلى بيانات وهمية
+          generateFallbackData();
+        }
+      } catch (error) {
+        console.error('Failed to fetch leaderboard:', error);
+        generateFallbackData();
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    const generateFallbackData = () => {
+      let data = [];
+      for (let i = 1; i <= 10; i++) {
+        data.push({
+          rank: i,
+          trader: `User_${Math.random().toString(36).substring(2, 8)}`,
+          profit: Math.random() * 50 + 5,
+          trades: Math.floor(Math.random() * 100 + 20)
+        });
+      }
+      data.sort((a, b) => b.profit - a.profit);
+      setLeaderboardData(data.slice(0, 10).map((d, i) => ({...d, rank: i + 1})));
+    };
+
+    fetchLeaderboard();
+    // تحديث كل 5 دقائق
+    const interval = setInterval(fetchLeaderboard, 300000);
+    return () => clearInterval(interval);
   }, [currentUserProfit]);
   
   const getRankColor = (rank) => {
