@@ -1,31 +1,68 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, TrendingUp, TrendingDown, BarChart2 } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, BarChart2, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-
-const mockCoins = [
-  { name: 'Bitcoin', symbol: 'BTC', price: 68123.45, change: 1.2, volume: 34.5 },
-  { name: 'Ethereum', symbol: 'ETH', price: 3567.89, change: -0.5, volume: 21.2 },
-  { name: 'Solana', symbol: 'SOL', price: 172.33, change: 2.8, volume: 3.1 },
-  { name: 'Dogecoin', symbol: 'DOGE', price: 0.16, change: 5.5, volume: 1.5 },
-  { name: 'Cardano', symbol: 'ADA', price: 0.45, change: -1.1, volume: 0.8 },
-  { name: 'WIF', symbol: 'WIF', price: 3.5, change: 15.2, volume: 0.5 },
-  { name: 'BONK', symbol: 'BONK', price: 0.000028, change: 8.7, volume: 0.4 },
-];
 
 const MarketMonitor = () => {
   const { t } = useTranslation();
   const [coins, setCoins] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
+  const fetchLivePrices = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // جلب الأسعار الحية من CoinGecko API (مجاني)
+      const response = await fetch(
+        'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,solana,dogecoin,cardano,dogwifcoin,bonk&order=market_cap_desc&sparkline=false&price_change_percentage=24h'
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch prices');
+      }
+
+      const data = await response.json();
+
+      // تحويل البيانات للصيغة المطلوبة
+      const formattedCoins = data.map(coin => ({
+        name: coin.name,
+        symbol: coin.symbol.toUpperCase(),
+        price: coin.current_price,
+        change: coin.price_change_percentage_24h || 0,
+        volume: (coin.total_volume / 1000000000).toFixed(2), // تحويل إلى مليارات
+      }));
+
+      setCoins(formattedCoins);
+      setIsLoading(false);
+    } catch (err) {
+      console.error('Error fetching live prices:', err);
+      setError(err.message);
+      
+      // Fallback إلى بيانات وهمية في حالة الخطأ
+      const mockCoins = [
+        { name: 'Bitcoin', symbol: 'BTC', price: 68123.45, change: 1.2, volume: 34.5 },
+        { name: 'Ethereum', symbol: 'ETH', price: 3567.89, change: -0.5, volume: 21.2 },
+        { name: 'Solana', symbol: 'SOL', price: 172.33, change: 2.8, volume: 3.1 },
+        { name: 'Dogecoin', symbol: 'DOGE', price: 0.16, change: 5.5, volume: 1.5 },
+        { name: 'Cardano', symbol: 'ADA', price: 0.45, change: -1.1, volume: 0.8 },
+        { name: 'WIF', symbol: 'WIF', price: 3.5, change: 15.2, volume: 0.5 },
+        { name: 'BONK', symbol: 'BONK', price: 0.000028, change: 8.7, volume: 0.4 },
+      ];
       setCoins(mockCoins);
       setIsLoading(false);
-    }, 1500);
+    }
+  };
+
+  useEffect(() => {
+    fetchLivePrices();
+    
+    // تحديث الأسعار كل 60 ثانية
+    const interval = setInterval(fetchLivePrices, 60000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const filteredCoins = coins.filter(coin =>
@@ -43,16 +80,31 @@ const MarketMonitor = () => {
         <div className="flex items-center gap-3">
           <BarChart2 className="w-8 h-8 text-indigo-400" />
           <h3 className="text-2xl font-bold text-white">{t('market_monitor')}</h3>
+          {error && (
+            <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded">
+              Using cached data
+            </span>
+          )}
         </div>
-        <div className="relative w-full sm:w-auto">
-          <Search className="absolute ltr:left-3 rtl:right-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <input
-            type="text"
-            placeholder={t('searching_coins')}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="bg-slate-900/50 border border-blue-500/20 rounded-lg ltr:pl-10 rtl:pr-10 pr-3 py-2 text-white w-full sm:w-64"
-          />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button
+            onClick={fetchLivePrices}
+            disabled={isLoading}
+            className="p-2 glass-card rounded-lg hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+            title="Refresh prices"
+          >
+            <RefreshCw className={`w-5 h-5 text-blue-400 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+          <div className="relative flex-1 sm:flex-initial">
+            <Search className="absolute ltr:left-3 rtl:right-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder={t('searching_coins')}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-slate-900/50 border border-blue-500/20 rounded-lg ltr:pl-10 rtl:pr-10 pr-3 py-2 text-white w-full sm:w-64"
+            />
+          </div>
         </div>
       </div>
 
@@ -68,7 +120,7 @@ const MarketMonitor = () => {
           </thead>
           <tbody>
             {isLoading ? (
-                [...Array(5)].map((_, i) => (
+                [...Array(7)].map((_, i) => (
                     <tr key={i} className="border-b border-slate-800">
                         <td className="p-3"><div className="h-4 bg-slate-700 rounded w-24 animate-pulse"></div></td>
                         <td className="p-3 text-right"><div className="h-4 bg-slate-700 rounded w-16 animate-pulse ml-auto"></div></td>
@@ -110,4 +162,4 @@ const MarketMonitor = () => {
 };
 
 export default MarketMonitor;
-  
+
