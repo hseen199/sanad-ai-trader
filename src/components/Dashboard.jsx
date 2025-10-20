@@ -32,10 +32,22 @@
             try {
               const lamports = await connection.getBalance(publicKey);
               const solBalance = lamports / LAMPORTS_PER_SOL;
-              const solPrice = 150; // سعر SOL تقريبي
-              const usdBalance = solBalance * solPrice;
-              setBalance(usdBalance);
-              localStorage.setItem('balance', usdBalance.toString());
+              
+              // جلب سعر SOL الحقيقي من API
+              try {
+                const priceResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/v1/price/solana`);
+                const priceData = await priceResponse.json();
+                const solPrice = priceData.status === 'success' ? priceData.price : 150;
+                const usdBalance = solBalance * solPrice;
+                setBalance(usdBalance);
+                localStorage.setItem('balance', usdBalance.toString());
+              } catch (priceError) {
+                console.error('Error fetching SOL price:', priceError);
+                // Fallback إلى سعر تقريبي
+                const usdBalance = solBalance * 150;
+                setBalance(usdBalance);
+                localStorage.setItem('balance', usdBalance.toString());
+              }
             } catch (error) {
               console.error('Error fetching balance:', error);
               // Fallback إلى localStorage
