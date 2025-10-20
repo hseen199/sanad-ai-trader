@@ -31,7 +31,7 @@ const ActiveTrades = ({ isBotActive, setProfit }) => {
       if (data.status === 'success' && data.positions) {
         // تحويل البيانات للصيغة المطلوبة
         const formattedTrades = data.positions.map(pos => ({
-          id: pos.id || Date.now() + Math.random(),
+          id: pos.id || `trade_${Date.now()}_${pos.token}`,
           pair: `${pos.token}/USDT`,
           amount: pos.amount || 0,
           entry: pos.entry_price || 0,
