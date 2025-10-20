@@ -1,11 +1,9 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import { Wallet } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
-const FinalCTA = ({ onConnect }) => {
+const FinalCTA = () => {
     const { t } = useTranslation();
 
     return (
@@ -26,14 +24,7 @@ const FinalCTA = ({ onConnect }) => {
                         <p className="text-xl text-blue-200 max-w-2xl mx-auto mb-8">
                             {t('final_cta_desc')}
                         </p>
-                        <Button
-                            onClick={onConnect}
-                            size="lg"
-                            className="bg-white text-blue-600 hover:bg-gray-200 text-lg px-8 py-6 font-bold shadow-lg"
-                        >
-                            <Wallet className="w-5 h-5 ltr:mr-2 rtl:ml-2" />
-                            {t('get_started_now')}
-                        </Button>
+                        <WalletMultiButton className="!bg-white !text-blue-600 hover:!bg-gray-200 !text-lg !px-8 !py-6 !font-bold !rounded-lg shadow-lg" />
                     </div>
                 </motion.div>
             </div>
@@ -42,4 +33,4 @@ const FinalCTA = ({ onConnect }) => {
 };
 
 export default FinalCTA;
-  
+
