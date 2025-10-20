@@ -5,61 +5,21 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { toast } from '@/components/ui/use-toast';
 import { useTranslation } from 'react-i18next';
-import { subscriptionService, accountService } from '@/services/apiService';
 
-const AccountOverview = ({ walletAddress }) => {
+const AccountOverview = () => {
   const { t } = useTranslation();
   const [tradeAmount, setTradeAmount] = useState([500]);
   const [riskLevel, setRiskLevel] = useState('medium');
   const [tradingPlan, setTradingPlan] = useState('balanced');
-  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
-  const [accountStats, setAccountStats] = useState({
-    totalTrades: 0,
-    winRate: 0,
-    avgProfit: 0
-  });
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!walletAddress) {
-        setLoading(false);
-        return;
-      }
-      
-      try {
-        setLoading(true);
-        
-        // جلب حالة الاشتراك
-        const subData = await subscriptionService.status(walletAddress);
-        if (subData.status === 'success') {
-          setSubscriptionStatus(subData);
-        }
-        
-        // جلب إحصائيات الحساب
-        const statsData = await accountService.overview(walletAddress);
-        if (statsData.status === 'success') {
-          setAccountStats({
-            totalTrades: statsData.total_trades || 0,
-            winRate: statsData.win_rate || 0,
-            avgProfit: statsData.avg_profit || 0
-          });
-        }
-      } catch (error) {
-        console.error('Failed to fetch account data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchData();
-    
-    // تحميل الإعدادات من localStorage
-    const settings = JSON.parse(localStorage.getItem('tradingSettings') || '{}');
-    if (settings.tradeAmount) setTradeAmount([settings.tradeAmount]);
-    if (settings.riskLevel) setRiskLevel(settings.riskLevel);
-    if (settings.tradingPlan) setTradingPlan(settings.tradingPlan);
-  }, [walletAddress]);
+    const settings = JSON.parse(localStorage.getItem('tradingSettings'));
+    if (settings) {
+      setTradeAmount([settings.tradeAmount]);
+      setRiskLevel(settings.riskLevel);
+      setTradingPlan(settings.tradingPlan);
+    }
+  }, []);
 
   const saveSettings = () => {
     localStorage.setItem('tradingSettings', JSON.stringify({
@@ -72,49 +32,6 @@ const AccountOverview = ({ walletAddress }) => {
       description: t('settings_saved_desc'),
     });
   };
-
-  const getSubscriptionType = () => {
-    if (!subscriptionStatus) return t('loading');
-    
-    if (subscriptionStatus.subscription_status === 'trial') {
-      return `${t('trial')} (${subscriptionStatus.days_remaining} ${t('days_remaining')})`;
-    } else if (subscriptionStatus.subscription_status === 'active') {
-      return t('premium');
-    } else {
-      return t('expired');
-    }
-  };
-
-  const getRenewalDate = () => {
-    if (!subscriptionStatus || !subscriptionStatus.expires_at) {
-      return t('not_available');
-    }
-    
-    try {
-      const date = new Date(subscriptionStatus.expires_at);
-      return date.toLocaleDateString('ar-SA', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
-      });
-    } catch (error) {
-      return t('not_available');
-    }
-  };
-
-  if (loading) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="grid lg:grid-cols-2 gap-6"
-      >
-        <div className="gradient-border p-6 rounded-xl">
-          <p className="text-center text-gray-400">جاري التحميل...</p>
-        </div>
-      </motion.div>
-    );
-  }
 
   return (
     <motion.div
@@ -132,25 +49,11 @@ const AccountOverview = ({ walletAddress }) => {
         <div className="space-y-3">
           <div className="flex justify-between items-center p-3 rounded-lg bg-slate-900/50">
             <span className="text-blue-300">{t('subscription_type')}</span>
-            <span className="text-white font-semibold">{getSubscriptionType()}</span>
+            <span className="text-white font-semibold">{t('premium')}</span>
           </div>
           <div className="flex justify-between items-center p-3 rounded-lg bg-slate-900/50">
             <span className="text-blue-300">{t('renewal_date')}</span>
-            <span className="text-white font-semibold">{getRenewalDate()}</span>
-          </div>
-          <div className="flex justify-between items-center p-3 rounded-lg bg-slate-900/50">
-            <span className="text-blue-300">إجمالي الصفقات</span>
-            <span className="text-white font-semibold">{accountStats.totalTrades}</span>
-          </div>
-          <div className="flex justify-between items-center p-3 rounded-lg bg-slate-900/50">
-            <span className="text-blue-300">نسبة النجاح</span>
-            <span className="text-green-400 font-semibold">{accountStats.winRate}%</span>
-          </div>
-          <div className="flex justify-between items-center p-3 rounded-lg bg-slate-900/50">
-            <span className="text-blue-300">متوسط الربح</span>
-            <span className={`font-semibold ${accountStats.avgProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {accountStats.avgProfit >= 0 ? '+' : ''}{accountStats.avgProfit.toFixed(2)}%
-            </span>
+            <span className="text-white font-semibold">15 Nov 2025</span>
           </div>
           <p className="text-xs text-center text-gray-400 pt-2">{t('monthly_fee')}</p>
           <Button
@@ -175,62 +78,30 @@ const AccountOverview = ({ walletAddress }) => {
           <div>
             <div className="flex justify-between items-center mb-2">
               <label className="text-white font-semibold">{t('trade_amount')}</label>
-              <span className="text-blue-400 font-mono">${tradeAmount[0]}</span>
+              <span className="text-blue-400 font-semibold">${tradeAmount[0]}</span>
             </div>
-            <Slider
-              value={tradeAmount}
-              onValueChange={setTradeAmount}
-              max={5000}
-              min={100}
-              step={50}
-              className="w-full"
-            />
+            <Slider value={tradeAmount} onValueChange={setTradeAmount} min={50} max={5000} step={50} />
           </div>
 
           <div>
-            <label className="text-white font-semibold block mb-2">{t('risk_level')}</label>
+            <label className="text-white font-semibold mb-2 block">{t('risk_level')}</label>
             <div className="grid grid-cols-3 gap-2">
-              {['low', 'medium', 'high'].map((level) => (
-                <button
-                  key={level}
-                  onClick={() => setRiskLevel(level)}
-                  className={`p-2 rounded-lg text-sm font-semibold transition-all ${
-                    riskLevel === level
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-slate-800 text-gray-400 hover:bg-slate-700'
-                  }`}
-                >
-                  {t(level)}
-                </button>
+              {['low', 'medium', 'high'].map(level => (
+                <Button key={level} onClick={() => setRiskLevel(level)} variant={riskLevel === level ? 'default' : 'outline'} className={riskLevel === level ? 'bg-blue-600' : 'border-blue-500/50'}>{t(level)}</Button>
               ))}
             </div>
           </div>
 
           <div>
-            <label className="text-white font-semibold block mb-2">{t('trading_plan')}</label>
+            <label className="text-white font-semibold mb-2 block">{t('trading_plan')}</label>
             <div className="grid grid-cols-3 gap-2">
-              {['conservative', 'balanced', 'aggressive'].map((plan) => (
-                <button
-                  key={plan}
-                  onClick={() => setTradingPlan(plan)}
-                  className={`p-2 rounded-lg text-sm font-semibold transition-all ${
-                    tradingPlan === plan
-                      ? 'bg-purple-500 text-white'
-                      : 'bg-slate-800 text-gray-400 hover:bg-slate-700'
-                  }`}
-                >
-                  {t(plan)}
-                </button>
+              {['conservative', 'balanced', 'aggressive'].map(plan => (
+                <Button key={plan} onClick={() => setTradingPlan(plan)} variant={tradingPlan === plan ? 'default' : 'outline'} className={tradingPlan === plan ? 'bg-blue-600' : 'border-blue-500/50'}>{t(plan)}</Button>
               ))}
             </div>
           </div>
 
-          <Button
-            onClick={saveSettings}
-            className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
-          >
-            {t('save_settings')}
-          </Button>
+          <Button onClick={saveSettings} className="w-full bg-gradient-to-r from-blue-600 to-purple-600">{t('save_settings')}</Button>
         </div>
       </div>
     </motion.div>
@@ -238,4 +109,3 @@ const AccountOverview = ({ walletAddress }) => {
 };
 
 export default AccountOverview;
-

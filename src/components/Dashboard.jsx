@@ -5,8 +5,6 @@
     import { Link } from 'react-router-dom';
     import { Shield, TrendingUp, TrendingDown, Bot } from 'lucide-react';
     import { useTranslation } from 'react-i18next';
-    import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-    import { LAMPORTS_PER_SOL } from '@solana/web3.js';
     import MyAccount from '@/components/dashboard/MyAccount';
     import ActiveTrades from '@/components/dashboard/ActiveTrades';
     import MarketMonitor from '@/components/dashboard/MarketMonitor';
@@ -22,95 +20,37 @@
       const [isAdmin, setIsAdmin] = useState(false);
       const [isBotActive, setIsBotActive] = useState(true);
     
-      const { connection } = useConnection();
-      const { publicKey } = useWallet();
-
-      // جلب الرصيد الحقيقي من Solana
       useEffect(() => {
-        const fetchBalance = async () => {
-          if (publicKey && connection) {
-            try {
-              const lamports = await connection.getBalance(publicKey);
-              const solBalance = lamports / LAMPORTS_PER_SOL;
-              
-              // جلب سعر SOL الحقيقي من API
-              try {
-                const priceResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/v1/price/solana`);
-                const priceData = await priceResponse.json();
-                const solPrice = priceData.status === 'success' ? priceData.price : 150;
-                const usdBalance = solBalance * solPrice;
-                setBalance(usdBalance);
-                localStorage.setItem('balance', usdBalance.toString());
-              } catch (priceError) {
-                console.error('Error fetching SOL price:', priceError);
-                // Fallback إلى سعر تقريبي
-                const usdBalance = solBalance * 150;
-                setBalance(usdBalance);
-                localStorage.setItem('balance', usdBalance.toString());
-              }
-            } catch (error) {
-              console.error('Error fetching balance:', error);
-              // Fallback إلى localStorage
-              const savedBalance = localStorage.getItem('balance');
-              if (savedBalance) setBalance(parseFloat(savedBalance));
-              else setBalance(5000);
-            }
-          } else {
-            // Fallback إلى localStorage
-            const savedBalance = localStorage.getItem('balance');
-            if (savedBalance) setBalance(parseFloat(savedBalance));
-            else setBalance(5000);
-          }
-        };
-
-        fetchBalance();
-        const interval = setInterval(fetchBalance, 30000);
-        return () => clearInterval(interval);
-      }, [publicKey, connection]);
-
-  // جلب بيانات الأداء من API
-  useEffect(() => {
-    const fetchPerformance = async () => {
-      if (!walletAddress) return;
-      
-      try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/v1/account/performance?wallet_address=${walletAddress}&period=7d`);
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-          setWeeklyProfit(data.weekly_profit || 0);
-          setProfit(data.total_profit || 0);
-          localStorage.setItem('weeklyProfit', data.weekly_profit.toString());
-          localStorage.setItem('profit', data.total_profit.toString());
-        }
-      } catch (error) {
-        console.error('Failed to fetch performance:', error);
-        // Fallback إلى localStorage
-        const savedWeeklyProfit = localStorage.getItem('weeklyProfit');
+        const savedBalance = localStorage.getItem('balance');
         const savedProfit = localStorage.getItem('profit');
-        if (savedWeeklyProfit) setWeeklyProfit(parseFloat(savedWeeklyProfit));
-        else setWeeklyProfit(0);
+        const savedWeeklyProfit = localStorage.getItem('weeklyProfit');
+        
+        if (savedBalance) setBalance(parseFloat(savedBalance));
+        else {
+          const initialBalance = 5000 + Math.random() * 15000;
+          setBalance(initialBalance);
+          localStorage.setItem('balance', initialBalance.toString());
+        }
+        
         if (savedProfit) setProfit(parseFloat(savedProfit));
-        else setProfit(0);
-      }
-    };
+        if (savedWeeklyProfit) setWeeklyProfit(parseFloat(savedWeeklyProfit));
+        else {
+            const initialWeeklyProfit = (Math.random() * 15) + 2;
+            setWeeklyProfit(initialWeeklyProfit);
+            localStorage.setItem('weeklyProfit', initialWeeklyProfit.toString());
+        }
     
-    fetchPerformance();
-    const interval = setInterval(fetchPerformance, 60000); // تحديث كل دقيقة
+        const adminWallets = JSON.parse(localStorage.getItem('adminWallets') || '[]');
+        if (adminWallets.includes(walletAddress)) {
+          setIsAdmin(true);
+        }
+        
+        const settings = JSON.parse(localStorage.getItem('tradingSettings'));
+        if (settings) {
+          setIsBotActive(settings.autoTrading !== false);
+        }
     
-    // فحص الصلاحيات والإعدادات
-    const adminWallets = JSON.parse(localStorage.getItem('adminWallets') || '[]');
-    if (adminWallets.includes(walletAddress)) {
-      setIsAdmin(true);
-    }
-    
-    const settings = JSON.parse(localStorage.getItem('tradingSettings'));
-    if (settings) {
-      setIsBotActive(settings.autoTrading !== false);
-    }
-    
-    return () => clearInterval(interval);
-  }, [walletAddress]);
+      }, [walletAddress]);
     
       return (
         <div className="container mx-auto px-4 py-8">

@@ -4,7 +4,15 @@ import { motion } from 'framer-motion';
 import { Search, TrendingUp, TrendingDown, BarChart2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { priceService } from '@/services/apiService';
+const mockCoins = [
+  { name: 'Bitcoin', symbol: 'BTC', price: 68123.45, change: 1.2, volume: 34.5 },
+  { name: 'Ethereum', symbol: 'ETH', price: 3567.89, change: -0.5, volume: 21.2 },
+  { name: 'Solana', symbol: 'SOL', price: 172.33, change: 2.8, volume: 3.1 },
+  { name: 'Dogecoin', symbol: 'DOGE', price: 0.16, change: 5.5, volume: 1.5 },
+  { name: 'Cardano', symbol: 'ADA', price: 0.45, change: -1.1, volume: 0.8 },
+  { name: 'WIF', symbol: 'WIF', price: 3.5, change: 15.2, volume: 0.5 },
+  { name: 'BONK', symbol: 'BONK', price: 0.000028, change: 8.7, volume: 0.4 },
+];
 
 const MarketMonitor = () => {
   const { t } = useTranslation();
@@ -13,56 +21,11 @@ const MarketMonitor = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchPrices = async () => {
-      try {
-        setIsLoading(true);
-        const symbols = ['bitcoin', 'ethereum', 'solana', 'dogecoin', 'cardano', 'dogwifhat', 'bonk'];
-        const data = await priceService.multiple(symbols);
-        
-        if (data.status === 'success' && data.prices) {
-          // تحويل البيانات إلى الصيغة المتوقعة
-          const formattedCoins = data.prices.map(coin => ({
-            name: coin.name || coin.symbol,
-            symbol: coin.symbol.toUpperCase(),
-            price: coin.current_price || 0,
-            change: coin.price_change_percentage_24h || 0,
-            volume: (coin.total_volume || 0) / 1000000000 // تحويل إلى مليار
-          }));
-          
-          setCoins(formattedCoins);
-        } else {
-          // Fallback إلى بيانات وهمية في حالة الفشل
-          setCoins([
-            { name: 'Bitcoin', symbol: 'BTC', price: 68123.45, change: 1.2, volume: 34.5 },
-            { name: 'Ethereum', symbol: 'ETH', price: 3567.89, change: -0.5, volume: 21.2 },
-            { name: 'Solana', symbol: 'SOL', price: 172.33, change: 2.8, volume: 3.1 },
-            { name: 'Dogecoin', symbol: 'DOGE', price: 0.16, change: 5.5, volume: 1.5 },
-            { name: 'Cardano', symbol: 'ADA', price: 0.45, change: -1.1, volume: 0.8 },
-            { name: 'WIF', symbol: 'WIF', price: 3.5, change: 15.2, volume: 0.5 },
-            { name: 'BONK', symbol: 'BONK', price: 0.000028, change: 8.7, volume: 0.4 },
-          ]);
-        }
-      } catch (error) {
-        console.error('Failed to fetch prices:', error);
-        // Fallback إلى بيانات وهمية
-        setCoins([
-          { name: 'Bitcoin', symbol: 'BTC', price: 68123.45, change: 1.2, volume: 34.5 },
-          { name: 'Ethereum', symbol: 'ETH', price: 3567.89, change: -0.5, volume: 21.2 },
-          { name: 'Solana', symbol: 'SOL', price: 172.33, change: 2.8, volume: 3.1 },
-          { name: 'Dogecoin', symbol: 'DOGE', price: 0.16, change: 5.5, volume: 1.5 },
-          { name: 'Cardano', symbol: 'ADA', price: 0.45, change: -1.1, volume: 0.8 },
-          { name: 'WIF', symbol: 'WIF', price: 3.5, change: 15.2, volume: 0.5 },
-          { name: 'BONK', symbol: 'BONK', price: 0.000028, change: 8.7, volume: 0.4 },
-        ]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchPrices();
-    // تحديث كل 30 ثانية
-    const interval = setInterval(fetchPrices, 30000);
-    return () => clearInterval(interval);
+    // Simulate API call
+    setTimeout(() => {
+      setCoins(mockCoins);
+      setIsLoading(false);
+    }, 1500);
   }, []);
 
   const filteredCoins = coins.filter(coin =>
