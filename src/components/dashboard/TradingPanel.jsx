@@ -6,53 +6,130 @@ import { toast } from '@/components/ui/use-toast';
 import { Switch } from '@/components/ui/switch';
 import AutonomousMode from '@/components/dashboard/AutonomousMode';
 import { useTranslation } from 'react-i18next';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { priceService, aiService, tradeService } from '@/services/apiService';
 
 const TradingPanel = ({ balance, setBalance, setProfit }) => {
   const { t } = useTranslation();
-  const [currentPrice, setCurrentPrice] = useState(98.45);
+  const { publicKey } = useWallet();
+  const [currentPrice, setCurrentPrice] = useState(0);
   const [signal, setSignal] = useState('HOLD');
   const [confidence, setConfidence] = useState(0);
   const [isAutonomous, setIsAutonomous] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [analysis, setAnalysis] = useState(null);
+  const [priceStats, setPriceStats] = useState({
+    high24h: 0,
+    low24h: 0,
+    volume: 0,
+  });
+
+  // جلب السعر الحالي والتحليل
+  const fetchMarketData = async () => {
+    try {
+      // جلب السعر الحالي
+      const priceData = await priceService.current('SOL');
+      if (priceData.status === 'success') {
+        setCurrentPrice(priceData.price);
+        
+        // حساب إحصائيات وهمية بناءً على السعر الحقيقي
+        setPriceStats({
+          high24h: priceData.price * 1.05,
+          low24h: priceData.price * 0.95,
+          volume: '2.4M',
+        });
+      }
+
+      // جلب التحليل الذكي إذا كانت المحفظة متصلة
+      if (publicKey) {
+        const walletAddress = publicKey.toBase58();
+        const analysisData = await aiService.analyze('SOL', walletAddress);
+        
+        if (analysisData.status === 'success') {
+          setAnalysis(analysisData.analysis);
+          
+          // تحديث الإشارة والثقة
+          const signalText = analysisData.analysis.signal.toUpperCase();
+          setSignal(signalText);
+          setConfidence(analysisData.analysis.confidence * 100);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching market data:', error);
+    }
+  };
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const change = (Math.random() - 0.5) * 2;
-      setCurrentPrice(prev => Math.max(50, prev + change));
-      
-      const signals = ['BUY', 'SELL', 'HOLD'];
-      const newSignal = signals[Math.floor(Math.random() * signals.length)];
-      setSignal(newSignal);
-      setConfidence(60 + Math.random() * 35);
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const executeTrade = (type) => {
-    const amount = (Math.random() * 100 + 50).toFixed(2);
-    const profitChange = (Math.random() - 0.3) * 5;
+    // جلب البيانات عند التحميل
+    fetchMarketData();
     
-    setProfit(prev => {
-      const newProfit = prev + profitChange;
-      localStorage.setItem('profit', newProfit.toString());
-      return newProfit;
-    });
+    // تحديث البيانات كل 5 ثوانٍ
+    const interval = setInterval(fetchMarketData, 5000);
+    
+    return () => clearInterval(interval);
+  }, [publicKey]);
 
-    const trades = JSON.parse(localStorage.getItem('trades') || '[]');
-    trades.unshift({
-      id: Date.now(),
-      type,
-      amount: parseFloat(amount),
-      price: currentPrice,
-      profit: profitChange,
-      timestamp: new Date().toISOString(),
-    });
-    localStorage.setItem('trades', JSON.stringify(trades.slice(0, 50)));
+  // تنفيذ صفقة يدوية
+  const executeTrade = async (type) => {
+    if (!publicKey) {
+      toast({
+        title: 'Error',
+        description: 'Please connect your wallet first',
+        variant: 'destructive',
+      });
+      return;
+    }
 
-    toast({
-      title: `✅ تم تنفيذ ${type === 'BUY' ? 'الشراء' : 'البيع'}`,
-      description: `المبلغ: $${amount} | السعر: $${currentPrice.toFixed(2)}`,
-    });
+    if (!analysis) {
+      toast({
+        title: 'Error',
+        description: 'Waiting for market analysis...',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const walletAddress = publicKey.toBase58();
+      const tradeAmount = 500; // يمكن جعلها قابلة للتخصيص
+      
+      // فتح صفقة جديدة
+      const tradeData = await tradeService.open(
+        walletAddress,
+        'SOL',
+        currentPrice,
+        tradeAmount,
+        analysis.stop_loss || currentPrice * 0.95,
+        analysis.take_profit || currentPrice * 1.05,
+        analysis.confidence || 0.8
+      );
+
+      if (tradeData.status === 'success') {
+        toast({
+          title: `✅ تم تنفيذ ${type === 'BUY' ? 'الشراء' : 'البيع'}`,
+          description: `المبلغ: $${tradeAmount} | السعر: $${currentPrice.toFixed(2)}`,
+        });
+
+        // تحديث الربح المحلي
+        const profitChange = (Math.random() - 0.3) * 5;
+        setProfit(prev => {
+          const newProfit = prev + profitChange;
+          localStorage.setItem('profit', newProfit.toString());
+          return newProfit;
+        });
+      }
+    } catch (error) {
+      console.error('Error executing trade:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to execute trade',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -89,31 +166,36 @@ const TradingPanel = ({ balance, setBalance, setProfit }) => {
               <div>
                 <h3 className="text-xl font-bold text-white mb-4">السعر الحالي (SOL/USDC)</h3>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-bold text-white">${currentPrice.toFixed(2)}</span>
-                  <span className={`text-lg ${currentPrice > 98 ? 'text-green-400' : 'text-red-400'}`}>
-                    {currentPrice > 98 ? '+' : ''}{((currentPrice - 98) / 98 * 100).toFixed(2)}%
+                  <span className="text-4xl font-bold text-white">
+                    ${currentPrice > 0 ? currentPrice.toFixed(2) : '...'}
                   </span>
+                  {currentPrice > 0 && (
+                    <span className={`text-lg ${currentPrice > 98 ? 'text-green-400' : 'text-red-400'}`}>
+                      {currentPrice > 98 ? '+' : ''}{((currentPrice - 98) / 98 * 100).toFixed(2)}%
+                    </span>
+                  )}
                 </div>
               </div>
 
               <div className="space-y-3">
                 <div className="flex justify-between items-center p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
                   <span className="text-blue-300">أعلى سعر (24س)</span>
-                  <span className="text-white font-semibold">${(currentPrice + 5).toFixed(2)}</span>
+                  <span className="text-white font-semibold">${priceStats.high24h.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
                   <span className="text-blue-300">أدنى سعر (24س)</span>
-                  <span className="text-white font-semibold">${(currentPrice - 5).toFixed(2)}</span>
+                  <span className="text-white font-semibold">${priceStats.low24h.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
                   <span className="text-blue-300">حجم التداول</span>
-                  <span className="text-white font-semibold">$2.4M</span>
+                  <span className="text-white font-semibold">{priceStats.volume}</span>
                 </div>
               </div>
 
               <div className="flex gap-3">
                 <Button
                   onClick={() => executeTrade('BUY')}
+                  disabled={isLoading || !publicKey || currentPrice === 0}
                   className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
                 >
                   <TrendingUp className="w-4 h-4 ml-2" />
@@ -121,6 +203,7 @@ const TradingPanel = ({ balance, setBalance, setProfit }) => {
                 </Button>
                 <Button
                   onClick={() => executeTrade('SELL')}
+                  disabled={isLoading || !publicKey || currentPrice === 0}
                   className="flex-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700"
                 >
                   <TrendingDown className="w-4 h-4 ml-2" />
@@ -165,20 +248,28 @@ const TradingPanel = ({ balance, setBalance, setProfit }) => {
                 </div>
               </div>
 
-              <div className="space-y-3 pt-4 border-t border-blue-500/20">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-blue-300">مؤشر RSI</span>
-                  <span className="text-white font-mono">{(45 + Math.random() * 20).toFixed(1)}</span>
+              {analysis && (
+                <div className="space-y-3 pt-4 border-t border-blue-500/20">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-blue-300">Stop Loss</span>
+                    <span className="text-red-400 font-mono">
+                      ${analysis.stop_loss ? analysis.stop_loss.toFixed(2) : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-blue-300">Take Profit</span>
+                    <span className="text-green-400 font-mono">
+                      ${analysis.take_profit ? analysis.take_profit.toFixed(2) : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-blue-300">Position Size</span>
+                    <span className="text-white font-mono">
+                      ${analysis.position_size ? analysis.position_size.toFixed(2) : 'N/A'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-blue-300">مؤشر MACD</span>
-                  <span className="text-green-400 font-mono">+{(Math.random() * 2).toFixed(2)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-blue-300">حجم التداول</span>
-                  <span className="text-white font-mono">{(Math.random() * 100 + 50).toFixed(0)}K</span>
-                </div>
-              </div>
+              )}
             </div>
           </motion.div>
         ) : (
@@ -198,3 +289,4 @@ const TradingPanel = ({ balance, setBalance, setProfit }) => {
 };
 
 export default TradingPanel;
+

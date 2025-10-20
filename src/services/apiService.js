@@ -37,6 +37,37 @@ const apiRequest = async (endpoint, options = {}) => {
 };
 
 /**
+ * Keep-Alive Service - منع نوم الباكند على Render
+ */
+export const keepAliveService = {
+  start: () => {
+    // Ping كل 10 دقائق لمنع النوم
+    const pingInterval = setInterval(async () => {
+      try {
+        await fetch(`${API_BASE_URL}/`, { method: 'GET' });
+        console.log('✅ Backend keep-alive ping successful');
+      } catch (error) {
+        console.warn('⚠️ Backend keep-alive ping failed:', error.message);
+      }
+    }, 10 * 60 * 1000); // 10 دقائق
+
+    // Ping فوري عند بدء التطبيق
+    fetch(`${API_BASE_URL}/`, { method: 'GET' })
+      .then(() => console.log('✅ Initial backend wake-up successful'))
+      .catch((error) => console.warn('⚠️ Initial backend wake-up failed:', error.message));
+
+    return pingInterval;
+  },
+
+  stop: (intervalId) => {
+    if (intervalId) {
+      clearInterval(intervalId);
+      console.log('🛑 Backend keep-alive stopped');
+    }
+  },
+};
+
+/**
  * خدمات المصادقة
  */
 export const authService = {
@@ -67,9 +98,8 @@ export const subscriptionService = {
   },
 
   status: async (walletAddress) => {
-    return apiRequest('/api/v1/subscription/status', {
-      method: 'POST',
-      body: JSON.stringify({ walletAddress }),
+    return apiRequest(`/api/v1/subscription/status?wallet_address=${walletAddress}`, {
+      method: 'GET',
     });
   },
 
@@ -77,6 +107,31 @@ export const subscriptionService = {
     return apiRequest('/api/v1/subscription/verify', {
       method: 'POST',
       body: JSON.stringify({ signature, walletAddress }),
+    });
+  },
+
+  activateTrial: async (walletAddress) => {
+    return apiRequest('/api/v1/subscription/activate-trial', {
+      method: 'POST',
+      body: JSON.stringify({ wallet_address: walletAddress }),
+    });
+  },
+
+  createPaymentRequest: async (walletAddress) => {
+    return apiRequest('/api/v1/subscription/payment-request', {
+      method: 'POST',
+      body: JSON.stringify({ wallet_address: walletAddress }),
+    });
+  },
+
+  verifyPayment: async (walletAddress, transactionSignature, amountPaid) => {
+    return apiRequest('/api/v1/subscription/verify-payment', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        wallet_address: walletAddress, 
+        transaction_signature: transactionSignature,
+        amount_paid: amountPaid 
+      }),
     });
   },
 };
@@ -140,6 +195,31 @@ export const tradeService = {
     });
   },
 
+  open: async (walletAddress, symbol, entryPrice, positionSize, stopLoss, takeProfit, confidence) => {
+    return apiRequest('/api/v1/trade/open', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        wallet_address: walletAddress, 
+        symbol, 
+        entry_price: entryPrice,
+        position_size: positionSize,
+        stop_loss: stopLoss,
+        take_profit: takeProfit,
+        confidence 
+      }),
+    });
+  },
+
+  close: async (walletAddress, positionId) => {
+    return apiRequest('/api/v1/trade/close', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        wallet_address: walletAddress, 
+        position_id: positionId 
+      }),
+    });
+  },
+
   history: async (walletAddress, limit = 50) => {
     return apiRequest(`/api/v1/trade/history?walletAddress=${walletAddress}&limit=${limit}`, {
       method: 'GET',
@@ -175,6 +255,13 @@ export const aiService = {
       method: 'GET',
     });
   },
+
+  analyze: async (symbol, walletAddress) => {
+    return apiRequest('/api/v1/analysis/live', {
+      method: 'POST',
+      body: JSON.stringify({ symbol, wallet_address: walletAddress }),
+    });
+  },
 };
 
 /**
@@ -182,20 +269,27 @@ export const aiService = {
  */
 export const portfolioService = {
   info: async (walletAddress) => {
-    return apiRequest(`/api/v1/portfolio/info?walletAddress=${walletAddress}`, {
+    return apiRequest(`/api/v1/portfolio/info?wallet_address=${walletAddress}`, {
       method: 'GET',
     });
   },
 
   positions: async (walletAddress) => {
-    return apiRequest(`/api/v1/portfolio/positions?walletAddress=${walletAddress}`, {
+    return apiRequest(`/api/v1/portfolio/positions?wallet_address=${walletAddress}`, {
       method: 'GET',
     });
   },
 
   history: async (walletAddress, limit = 50) => {
-    return apiRequest(`/api/v1/portfolio/history?walletAddress=${walletAddress}&limit=${limit}`, {
+    return apiRequest(`/api/v1/portfolio/history?wallet_address=${walletAddress}&limit=${limit}`, {
       method: 'GET',
+    });
+  },
+
+  create: async (walletAddress, initialBalance = 10000) => {
+    return apiRequest('/api/v1/portfolio/create', {
+      method: 'POST',
+      body: JSON.stringify({ wallet_address: walletAddress, initial_balance: initialBalance }),
     });
   },
 };
