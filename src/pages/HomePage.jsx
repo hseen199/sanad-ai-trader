@@ -1,7 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useWallet } from '@solana/wallet-adapter-react';
 import Header from '@/components/Header';
 import Hero from '@/components/Hero';
 import Dashboard from '@/components/Dashboard';
@@ -17,34 +17,46 @@ import FinalCTA from '@/components/FinalCTA';
 
 const HomePage = () => {
   const { t, i18n } = useTranslation();
-  const { publicKey, connected } = useWallet();
+  const [isConnected, setIsConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState('');
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // التحقق من الاشتراك عند الاتصال
-    if (connected && publicKey) {
-      const walletAddress = publicKey.toBase58();
-      const subscription = JSON.parse(localStorage.getItem(`subscription_${walletAddress}`) || 'null');
+    const savedWallet = localStorage.getItem('phantomWallet');
+    if (savedWallet) {
+      setWalletAddress(savedWallet);
+      setIsConnected(true);
       
+      const subscription = JSON.parse(localStorage.getItem(`subscription_${savedWallet}`));
       if (subscription && new Date(subscription.expiry) > new Date()) {
         setIsSubscribed(true);
-      } else {
-        setIsSubscribed(false);
       }
-    } else {
-      setIsSubscribed(false);
     }
-    
     setIsLoading(false);
     document.documentElement.dir = i18n.language === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = i18n.language;
-  }, [connected, publicKey, i18n.language]);
+  }, [i18n.language]);
+
+  const handleConnect = (address) => {
+    setWalletAddress(address);
+    setIsConnected(true);
+    localStorage.setItem('phantomWallet', address);
+
+    const subscription = JSON.parse(localStorage.getItem(`subscription_${address}`));
+      if (subscription && new Date(subscription.expiry) > new Date()) {
+        setIsSubscribed(true);
+      }
+  };
+
+  const handleDisconnect = () => {
+    setWalletAddress('');
+    setIsConnected(false);
+    setIsSubscribed(false);
+    localStorage.removeItem('phantomWallet');
+  };
 
   const handleSubscription = () => {
-    if (!publicKey) return;
-    
-    const walletAddress = publicKey.toBase58();
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() + 30);
     const subscriptionData = { expiry: expiryDate.toISOString() };
@@ -61,27 +73,24 @@ const HomePage = () => {
       );
     }
 
-    // غير متصل - عرض الصفحة الرئيسية
-    if (!connected || !publicKey) {
+    if (!isConnected) {
       return (
         <>
-          <Hero />
+          <Hero onConnect={handleConnect} />
           <Features />
           <HowItWorks />
           <AiPower />
           <Faq />
-          <FinalCTA />
+          <FinalCTA onConnect={handleConnect} />
         </>
       );
     }
 
-    // متصل لكن غير مشترك - عرض صفحة الاشتراك
     if (!isSubscribed) {
       return <Subscription onSubscribe={handleSubscription} />;
     }
 
-    // متصل ومشترك - عرض Dashboard
-    return <Dashboard walletAddress={publicKey.toBase58()} />;
+    return <Dashboard walletAddress={walletAddress} />;
   };
 
   return (
@@ -102,12 +111,17 @@ const HomePage = () => {
         ></div>
         
         <div className="relative z-10 flex flex-col min-h-screen">
-          <Header />
+          <Header 
+            isConnected={isConnected}
+            walletAddress={walletAddress}
+            onConnect={handleConnect}
+            onDisconnect={handleDisconnect}
+          />
 
           <main className="flex-grow">
             <AnimatePresence mode="wait">
               <motion.div
-                key={connected ? (isSubscribed ? 'dashboard' : 'subscription') : 'landing'}
+                key={isConnected ? (isSubscribed ? 'dashboard' : 'subscription') : 'landing'}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
@@ -128,4 +142,4 @@ const HomePage = () => {
 };
 
 export default HomePage;
-
+  
