@@ -5,17 +5,41 @@ import React from 'react';
     import { Button } from '@/components/ui/button';
     import { toast } from '@/components/ui/use-toast';
     import { useTranslation } from 'react-i18next';
+    import { useWallet } from '@solana/wallet-adapter-react';
     
     const Hero = ({ onConnect }) => {
       const { t } = useTranslation();
+      const { select, wallets, publicKey, connected } = useWallet();
     
       const connectWallet = async () => {
-        const mockAddress = 'SANAD' + Math.random().toString(36).substring(2, 15).toUpperCase();
-        onConnect(mockAddress);
-        toast({
-          title: t('connected_successfully'),
-          description: t('phantom_connected'),
-        });
+        try {
+          // محاولة الاتصال بـ Phantom
+          const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+          if (phantomWallet) {
+            select(phantomWallet.adapter.name);
+          } else if (wallets.length > 0) {
+            // إذا Phantom مش موجود، استخدم أول محفظة متاحة
+            select(wallets[0].adapter.name);
+          }
+          
+          // انتظر الاتصال
+          setTimeout(() => {
+            if (publicKey) {
+              onConnect(publicKey.toBase58());
+              toast({
+                title: t('connected_successfully'),
+                description: t('phantom_connected'),
+              });
+            }
+          }, 1000);
+        } catch (error) {
+          console.error('Wallet connection error:', error);
+          toast({
+            title: 'Error',
+            description: 'Failed to connect wallet. Please try again.',
+            variant: 'destructive',
+          });
+        }
       };
     
       return (

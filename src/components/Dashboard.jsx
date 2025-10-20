@@ -5,6 +5,8 @@
     import { Link } from 'react-router-dom';
     import { Shield, TrendingUp, TrendingDown, Bot } from 'lucide-react';
     import { useTranslation } from 'react-i18next';
+    import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+    import { LAMPORTS_PER_SOL } from '@solana/web3.js';
     import MyAccount from '@/components/dashboard/MyAccount';
     import ActiveTrades from '@/components/dashboard/ActiveTrades';
     import MarketMonitor from '@/components/dashboard/MarketMonitor';
@@ -20,17 +22,45 @@
       const [isAdmin, setIsAdmin] = useState(false);
       const [isBotActive, setIsBotActive] = useState(true);
     
+      const { connection } = useConnection();
+      const { publicKey } = useWallet();
+
+      // جلب الرصيد الحقيقي من Solana
       useEffect(() => {
-        const savedBalance = localStorage.getItem('balance');
+        const fetchBalance = async () => {
+          if (publicKey && connection) {
+            try {
+              const lamports = await connection.getBalance(publicKey);
+              const solBalance = lamports / LAMPORTS_PER_SOL;
+              const solPrice = 150; // سعر SOL تقريبي
+              const usdBalance = solBalance * solPrice;
+              setBalance(usdBalance);
+              localStorage.setItem('balance', usdBalance.toString());
+            } catch (error) {
+              console.error('Error fetching balance:', error);
+              // Fallback إلى localStorage
+              const savedBalance = localStorage.getItem('balance');
+              if (savedBalance) setBalance(parseFloat(savedBalance));
+              else setBalance(5000);
+            }
+          } else {
+            // Fallback إلى localStorage
+            const savedBalance = localStorage.getItem('balance');
+            if (savedBalance) setBalance(parseFloat(savedBalance));
+            else setBalance(5000);
+          }
+        };
+
+        fetchBalance();
+        const interval = setInterval(fetchBalance, 30000);
+        return () => clearInterval(interval);
+      }, [publicKey, connection]);
+
+      useEffect(() => {
         const savedProfit = localStorage.getItem('profit');
         const savedWeeklyProfit = localStorage.getItem('weeklyProfit');
         
-        if (savedBalance) setBalance(parseFloat(savedBalance));
-        else {
-          const initialBalance = 5000 + Math.random() * 15000;
-          setBalance(initialBalance);
-          localStorage.setItem('balance', initialBalance.toString());
-        }
+        if (savedProfit) setProfit(parseFloat(savedProfit));
         
         if (savedProfit) setProfit(parseFloat(savedProfit));
         if (savedWeeklyProfit) setWeeklyProfit(parseFloat(savedWeeklyProfit));
